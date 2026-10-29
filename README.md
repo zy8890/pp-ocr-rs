@@ -16,6 +16,20 @@
 cargo build --release
 ```
 
+### 交叉编译 Linux（macOS → x86_64）
+
+静态链接 ONNX Runtime 时，`cargo zigbuild` 会因 C++ 符号（`libstdc++`）失败。本项目将 `ort` 设为 **`load-dynamic`**，交叉编译只链动态库名，运行时再加载 `.so`。
+
+```bash
+# 依赖：rustup target add x86_64-unknown-linux-gnu；cargo install cargo-zigbuild；安装 zig
+cargo zigbuild --release --target x86_64-unknown-linux-gnu --bin idorc-server
+
+# 一键打包（二进制 + default.toml + 脚本 + 官方 libonnxruntime.so）
+./scripts/package-linux.sh
+# 产物目录：dist/linux-x86_64/
+```
+
+Linux 运行时需将 `libonnxruntime.so`（建议 **1.24.2**，与 ort 预编译一致）放在 `idorc-server` 同目录，或设置 `ORT_DYLIB_PATH`。
 ## 使用
 
 ```bash
@@ -67,18 +81,37 @@ cargo run --release --bin idorc -- --image testdata/gen/front.png --format zh
 
 ## HTTP API（idorc-server）
 
-Tokio + Poem + OpenAPI/Redoc。默认 **3** 个 OCR worker；需 Bearer API Key。
+Tokio + Poem + OpenAPI/Redoc。配置见 `default.toml`（端口、worker、模型目录、api_key 等）。
+
+### 发布包需要带上
+
+| 文件/目录 | 说明 |
+|-----------|------|
+| `idorc-server` | 本机 `cargo build --release`，或 `scripts/package-linux.sh` 交叉产物 |
+| `libonnxruntime.so*` | **Linux 交叉包必带**（`load-dynamic`）；本机静态/系统 ORT 可省略 |
+| `models/` | ONNX 模型（不进二进制；离线必带） |
+| `default.toml` | 监听端口、api_key、workers 等 |
+| `start.sh` / `stop.sh` | 后台启停 |
+
+可选：有网时可先不带 `models/`，首次启动自动下载。
+### 配置优先级
+
+`环境变量 IDORC_API_KEY` > 命令行 `--api-key` / `--host` / `--port` / `--base` 等 > `default.toml`
+
+`default.toml` 示例：`host` / `port` / `base = "/ocrapi"`（所有路由带此前缀）。
+
+### 启动
 
 ```bash
-export IDORC_API_KEY=dev-secret
-cargo run --release --bin idorc-server -- --bind 127.0.0.1:8080 --workers 3 --fast
+cargo build --release --bin idorc-server
+cp target/release/idorc-server .   # 发布目录与 default.toml、models 同级
+./start.sh    # nohup ./idorc-server > log.txt，pid 写入 idorc-server.pid
+./stop.sh
 
-# Redoc: http://127.0.0.1:8080/docs
-# OpenAPI: http://127.0.0.1:8080/openapi.json
-
-curl -s http://127.0.0.1:8080/health
-curl -s -H "Authorization: Bearer $IDORC_API_KEY" \
-  -F file=@234.png http://127.0.0.1:8080/v1/idcard/ocr
+# 默认 base=/ocrapi
+# Redoc / OpenAPI: http://127.0.0.1:8080/ocrapi/docs 、 /ocrapi/spec
+curl -s -H "Authorization: Bearer <api_key>" \
+  -F file=@234.png http://127.0.0.1:8080/ocrapi/idcard/ocr
 ```
 
 成功响应含 `zh` / `en` 字段分组与 `meta`（校验位、耗时等）。

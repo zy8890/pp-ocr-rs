@@ -1,0 +1,31 @@
+# idorc-server 默认配置（与二进制同目录，或通过 --config 指定）
+
+# 监听 IP / 端口
+host = "0.0.0.0"
+port = 8080
+
+# HTTP 服务前缀（所有接口挂在此前缀下，如 /ocrapi/health）
+base = "/ocrapi"
+
+# API Key；也可用环境变量 IDORC_API_KEY（环境变量优先）
+api_key = "change-me"
+
+# OCR 并行 worker 数
+workers = 3
+
+# 上传上限（MB）
+max_upload_mb = 10
+
+# ONNX 模型目录（相对当前工作目录）
+model_dir = "models"
+
+# 模型集：ppocrv5-ch-server（准） / 或设 fast = true 用小模型
+model_set = "ppocrv5-ch-server"
+fast = false
+
+# 文本行方向分类 / 自动旋转
+use_cls = true
+auto_rotate = true
+
+# 字段 reliable 阈值
+min_confidence = 0.80

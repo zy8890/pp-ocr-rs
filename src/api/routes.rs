@@ -103,7 +103,7 @@ impl IdCardApi {
     }
 
     /// 上传图片识别（multipart，字段名 `file`）
-    #[oai(path = "/v1/idcard/ocr", method = "post")]
+    #[oai(path = "/idcard/ocr", method = "post")]
     async fn ocr_multipart(&self, _auth: BearerAuth, upload: OcrUpload) -> OcrHttpResponse {
         let bytes = match upload.file.into_vec().await {
             Ok(b) => b,
@@ -115,7 +115,7 @@ impl IdCardApi {
     }
 
     /// Base64 图片识别
-    #[oai(path = "/v1/idcard/ocr/base64", method = "post")]
+    #[oai(path = "/idcard/ocr/base64", method = "post")]
     async fn ocr_base64(&self, _auth: BearerAuth, body: Json<Base64Request>) -> OcrHttpResponse {
         let bytes = match decode_base64_image(&body.0.image_base64) {
             Ok(b) => b,

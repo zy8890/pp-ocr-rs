@@ -1,5 +1,6 @@
 .worktrees/
 /target
+/dist
 /models
 *.jpg
 *.jpeg
@@ -9,3 +10,7 @@
 .DS_Store
 /testdata/
 /rust_out
+/log.txt
+/idorc-server.pid
+/idorc-server
+
