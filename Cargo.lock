@@ -964,6 +964,7 @@ dependencies = [
  "image",
  "ort",
  "pretty_assertions",
+ "rand 0.8.8",
  "rapidocr-core",
  "regex",
  "serde",
