@@ -8,7 +8,7 @@ pub mod parse;
 pub mod preprocess;
 
 pub use engine::{IdCardOcr, OcrEngineOptions, RecognizeTimings};
-pub use format_out::{to_zh_json, to_zh_text};
+pub use format_out::{to_en_json, to_zh_json, to_zh_text};
 pub use id_card::{
     FieldValue, IdCardBack, IdCardFront, IdCardResult, IdCardSide,
 };

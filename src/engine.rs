@@ -13,8 +13,8 @@ use rapidocr_core::{
 use crate::id_card::IdCardResult;
 use crate::parse::structured::{parse_id_card_with_options, ParseOptions};
 use crate::preprocess::{
-    candidate_degrees, downscale_max_side, is_upright_enough, load_rgb_with_exif,
-    orientation_score, rotate_clockwise, ORIENT_PROBE_MAX_SIDE,
+    candidate_degrees, downscale_max_side, is_upright_enough, load_rgb_from_memory,
+    load_rgb_with_exif, orientation_score, rotate_clockwise, ORIENT_PROBE_MAX_SIDE,
 };
 
 /// OCR 引擎初始化选项。
@@ -160,7 +160,30 @@ impl IdCardOcr {
     ) -> Result<(IdCardResult, RecognizeTimings)> {
         let total = Instant::now();
         let (output, rotation_degrees, mut timings) = self.run_with_orientation(path)?;
+        self.finish_recognize(output, rotation_degrees, &mut timings, total)
+    }
 
+    /// 从内存图片字节识别（供 HTTP API 使用）。
+    pub fn recognize_id_card_bytes_timed(
+        &mut self,
+        bytes: &[u8],
+    ) -> Result<(IdCardResult, RecognizeTimings)> {
+        let total = Instant::now();
+        let mut timings = RecognizeTimings::default();
+        let t_load = Instant::now();
+        let image = load_rgb_from_memory(bytes).context("加载图片失败")?;
+        timings.load_image_ms = t_load.elapsed().as_secs_f64() * 1000.0;
+        let (output, rotation_degrees) = self.run_image_with_orientation(&image, &mut timings)?;
+        self.finish_recognize(output, rotation_degrees, &mut timings, total)
+    }
+
+    fn finish_recognize(
+        &self,
+        output: OcrOutput,
+        rotation_degrees: u32,
+        timings: &mut RecognizeTimings,
+        total: Instant,
+    ) -> Result<(IdCardResult, RecognizeTimings)> {
         let t_parse = Instant::now();
         let mut result = parse_id_card_with_options(
             &output,
@@ -177,7 +200,7 @@ impl IdCardOcr {
                 .push(format!("已顺时针旋转 {rotation_degrees}° 后识别"));
         }
         timings.total_ms = total.elapsed().as_secs_f64() * 1000.0;
-        Ok((result, timings))
+        Ok((result, timings.clone()))
     }
 
     fn run_with_orientation(

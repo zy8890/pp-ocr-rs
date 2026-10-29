@@ -1,5 +1,6 @@
 //! 读图（含 EXIF）与 90° 步进的自动旋转矫正。
 
+use std::io::Cursor;
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -21,6 +22,22 @@ pub fn load_rgb_with_exif(path: impl AsRef<Path>) -> Result<RgbImage> {
         .unwrap_or(image::metadata::Orientation::NoTransforms);
     let mut image = DynamicImage::from_decoder(decoder)
         .with_context(|| format!("解码图片失败: {}", path.display()))?;
+    image.apply_orientation(orientation);
+    Ok(image.to_rgb8())
+}
+
+/// 从内存字节加载 RGB 图并应用 EXIF 方向。
+pub fn load_rgb_from_memory(bytes: &[u8]) -> Result<RgbImage> {
+    let reader = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .context("识别图片格式失败")?;
+    let mut decoder = reader
+        .into_decoder()
+        .context("解码图片失败")?;
+    let orientation = decoder
+        .orientation()
+        .unwrap_or(image::metadata::Orientation::NoTransforms);
+    let mut image = DynamicImage::from_decoder(decoder).context("解码图片失败")?;
     image.apply_orientation(orientation);
     Ok(image.to_rgb8())
 }
