@@ -53,3 +53,14 @@ println!("{:?}", result.front);
 - 拍摄时尽量正面、无强反光、分辨率 ≥ 1280 宽，可显著提高准确率
 - 国徽面无身份证号，解析依赖「签发机关」「有效期限」等关键词与版面位置
 - 本项目为 OCR + 规则/版面解析，**不**替代公安联网核验
+
+## 测试图生成（idgen）
+
+基于公开模板合成**人像面**测试图，仅供 OCR 学习与自动化测试，**禁止用于伪造证件**。
+
+```bash
+cargo run --release --bin idgen -- --random -o testdata/gen/front.png
+cargo run --release -- --image testdata/gen/front.png
+```
+
+资源见 `assets/idgen/`（源自 [idcard_generator-](https://github.com/xiamuguizhi/idcard_generator-)）。
