@@ -63,4 +63,4 @@ cargo run --release --bin idgen -- --random -o testdata/gen/front.png
 cargo run --release --bin idorc -- --image testdata/gen/front.png --format zh
 ```
 
-资源见 `assets/idgen/`（源自 [idcard_generator-](https://github.com/xiamuguizhi/idcard_generator-)）。
+资源见 `assets/idgen/`。

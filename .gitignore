@@ -7,5 +7,5 @@
 !assets/idgen/**
 !assets/idgen/**/*.png
 .DS_Store
-/_ref_idcard_gen/
 /testdata/
+/rust_out
