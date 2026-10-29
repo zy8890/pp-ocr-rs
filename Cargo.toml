@@ -1,0 +1,21 @@
+[package]
+name = "idorc"
+version = "0.1.0"
+edition = "2021"
+description = "中国二代身份证离线 OCR（RapidOCR-ONNX + 结构化解析）"
+license = "Apache-2.0"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+image = "0.25"
+rapidocr-core = "0.2.2"
+# rapidocr-core 0.2.2 与 ort 2.0.0-rc.15 API 不兼容，需锁定 rc.12
+ort = "=2.0.0-rc.12"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+
+[dev-dependencies]
+pretty_assertions = "1"

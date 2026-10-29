@@ -1,7 +1,7 @@
 # 身份证测试图生成器（idgen）设计
 
 **日期：** 2026-10-29  
-**状态：** 待用户审阅  
+**状态：** 已批准  
 **目的：** 为 `idorc` OCR 回归测试生成合成「人像面」图片（仅供学习/测试，不用于伪造证件）。
 
 参考实现：[xiamuguizhi/idcard_generator-](https://github.com/xiamuguizhi/idcard_generator-)（底图 + 固定坐标写字）。

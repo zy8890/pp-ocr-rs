@@ -1,0 +1,10 @@
+/target
+/models
+*.jpg
+*.jpeg
+*.png
+.DS_Store
+
+.worktrees/
+/_ref_idcard_gen/
+/testdata/
