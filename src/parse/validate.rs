@@ -16,6 +16,7 @@ pub fn id_check_digit(body17: &str) -> Option<char> {
 
 /// `body17` + 校验位 → 18 位号码。
 pub fn compose_id_number(body17: &str) -> Option<String> {
+    let body17 = body17.trim();
     let d = id_check_digit(body17)?;
     Some(format!("{body17}{d}"))
 }

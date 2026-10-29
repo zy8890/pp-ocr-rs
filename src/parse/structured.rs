@@ -201,21 +201,21 @@ fn parse_front(
         }
     }
 
+    // —— 公民身份号码（先于出生，避免出生正则误吞 18 位号码行）——
+    front.id_number = pair_id_number(items, &mut used, min_c, warnings);
+
     // —— 出生 ——
     front.birth_date = pair_field(
         items,
         &mut used,
         &["出生"],
         min_c,
-        |s| parse_birth_from_line(s).is_some(),
+        |s| looks_like_birth_line(s),
         parse_birth_from_line,
     );
 
     // —— 住址（可多行）——
     front.address = pair_address(items, &mut used, min_c);
-
-    // —— 公民身份号码 ——
-    front.id_number = pair_id_number(items, &mut used, min_c, warnings);
     front.id_checksum_ok = front
         .id_number
         .as_ref()
@@ -244,7 +244,10 @@ fn parse_front(
             if used[i] {
                 return None;
             }
-            parse_birth_from_line(&l.text).map(|d| (i, (d, l.score)))
+            looks_like_birth_line(&l.text)
+                .then(|| parse_birth_from_line(&l.text))
+                .flatten()
+                .map(|d| (i, (d, l.score)))
         }) {
             used[idx] = true;
             front.birth_date = Some(FieldValue::new(d.0, d.1, min_c));
@@ -458,7 +461,7 @@ fn pair_address(items: &[LineItem], used: &mut [bool], min_c: f32) -> Option<Fie
                 && l.x0 >= label.x0 - label.height * 2.0
                 && !is_field_label(&l.text)
                 && find_valid_id_number(&l.text).is_none()
-                && parse_birth_from_line(&l.text).is_none()
+                && !looks_like_birth_line(&l.text)
         })
         .map(|(i, l)| (i, l))
         .collect();
@@ -716,7 +719,22 @@ fn parse_gender(s: &str) -> Option<String> {
     }
 }
 
+/// 出生行候选：排除整段 18 位公民身份号码（内含 YYYYMMDD 子串）。
+fn looks_like_birth_line(s: &str) -> bool {
+    if find_valid_id_number(s).is_some() {
+        return false;
+    }
+    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    if digits.len() >= 17 && digits.chars().all(|c| c.is_ascii_digit()) {
+        return false;
+    }
+    parse_birth_from_line(s).is_some()
+}
+
 fn parse_birth_from_line(s: &str) -> Option<String> {
+    if find_valid_id_number(s).is_some() {
+        return None;
+    }
     use regex::Regex;
     use std::sync::OnceLock;
     static RE: OnceLock<Regex> = OnceLock::new();
@@ -838,6 +856,28 @@ mod tests {
             Some("1990-05-12")
         );
         assert!(f.id_number.is_some());
+    }
+
+    #[test]
+    fn birth_find_below_does_not_consume_id_number_line() {
+        // 「出生」标签右侧无日期时，正下方可能是号码行；不得占用，否则公民身份号码为空。
+        let output = OcrOutput {
+            lines: vec![
+                line("姓名", 80.0, 40.0, 160.0, 70.0, 0.99),
+                line("王飞", 180.0, 38.0, 280.0, 72.0, 0.99),
+                line("出生", 80.0, 140.0, 160.0, 170.0, 0.99),
+                line("522530199208180048", 180.0, 175.0, 620.0, 205.0, 0.99),
+                line("公民身份号码", 80.0, 320.0, 280.0, 350.0, 0.99),
+                line("522530199208180048", 300.0, 320.0, 620.0, 350.0, 0.99),
+            ],
+        };
+        let r = parse_id_card(&output);
+        let f = r.front.expect("front");
+        assert_eq!(
+            f.id_number.as_ref().map(|v| v.value.as_str()),
+            Some("522530199208180048")
+        );
+        assert!(f.birth_date.is_none());
     }
 
     #[test]

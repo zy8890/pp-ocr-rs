@@ -1,3 +1,4 @@
+.worktrees/
 /target
 /models
 *.jpg
