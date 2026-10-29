@@ -3,8 +3,8 @@
 *.jpg
 *.jpeg
 *.png
+!assets/idgen/**
+!assets/idgen/**/*.png
 .DS_Store
-
-.worktrees/
 /_ref_idcard_gen/
 /testdata/
