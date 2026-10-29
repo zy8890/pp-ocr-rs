@@ -1,7 +1,7 @@
 # idorc HTTP API 服务设计
 
 **日期：** 2026-10-29  
-**状态：** 待用户审阅  
+**状态：** 已批准  
 **栈：** Tokio + Poem + poem-openapi + Redoc  
 
 在现有 `IdCardOcr` 库之上提供身份证识别 HTTP API（单进程、可并发接入）。
