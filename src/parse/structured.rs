@@ -204,15 +204,8 @@ fn parse_front(
     // —— 公民身份号码（先于出生，避免出生正则误吞 18 位号码行）——
     front.id_number = pair_id_number(items, &mut used, min_c, warnings);
 
-    // —— 出生 ——
-    front.birth_date = pair_field(
-        items,
-        &mut used,
-        &["出生"],
-        min_c,
-        |s| looks_like_birth_line(s),
-        parse_birth_from_line,
-    );
+    // —— 出生（可能拆成「出生1970」+「年6月12日」等多框）——
+    front.birth_date = pair_birth(items, &mut used, min_c);
 
     // —— 住址（可多行）——
     front.address = pair_address(items, &mut used, min_c);
@@ -422,6 +415,88 @@ where
     None
 }
 
+/// 出生：合并同行多框（如「出生1970」+「年6月12日」），再解析日期。
+fn pair_birth(items: &[LineItem], used: &mut [bool], min_c: f32) -> Option<FieldValue> {
+    let label_idx = find_label_index(items, used, &["出生"])?;
+    let label = &items[label_idx];
+    used[label_idx] = true;
+
+    let mut parts: Vec<(String, f32)> = Vec::new();
+    if let Some(rest) = strip_label_prefix(&label.text, "出生") {
+        if !rest.is_empty() {
+            parts.push((rest, label.score * SAME_BOX_PENALTY));
+        }
+    }
+
+    let row_tol = label.height.max(8.0) * 1.2;
+    let label_cx = (label.x0 + label.x1) / 2.0;
+    let mut right: Vec<(usize, &LineItem)> = items
+        .iter()
+        .enumerate()
+        .filter(|(i, l)| {
+            !used[*i]
+                && (l.cy - label.cy).abs() <= row_tol
+                && (l.x0 + l.x1) / 2.0 > label_cx
+                && l.x1 > label.x0
+                && looks_like_birth_fragment(&l.text)
+        })
+        .map(|(i, l)| (i, l))
+        .collect();
+    right.sort_by(|a, b| {
+        a.1.x0
+            .partial_cmp(&b.1.x0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    for (i, l) in right {
+        used[i] = true;
+        parts.push((l.text.clone(), l.score));
+    }
+
+    // 仍不完整时，尝试正下方一个出生片段（非身份证号）
+    if parse_birth_from_line(&parts.iter().map(|(t, _)| t.as_str()).collect::<String>()).is_none() {
+        if let Some(idx) = find_below(items, used, label, &|s| looks_like_birth_fragment(s)) {
+            let item = &items[idx];
+            used[idx] = true;
+            parts.push((item.text.clone(), item.score));
+        }
+    }
+
+    if parts.is_empty() {
+        return None;
+    }
+    let confidence = parts.iter().map(|(_, s)| *s).fold(1.0_f32, f32::min);
+    let joined = parts.into_iter().map(|(t, _)| t).collect::<String>();
+    let value = parse_birth_from_line(&joined)?;
+    Some(FieldValue::new(value, confidence, min_c))
+}
+
+/// 出生日期片段：完整日期、单独年份、或「年/月/日」残片；排除身份证号。
+fn looks_like_birth_fragment(s: &str) -> bool {
+    if find_valid_id_number(s).is_some() {
+        return false;
+    }
+    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    if digits.len() >= 17 {
+        return false;
+    }
+    if looks_like_birth_line(s) {
+        return true;
+    }
+    if is_year_only(s) {
+        return true;
+    }
+    // 「年6月12日」「6月12日」等
+    let has_md = s.contains('月') || s.contains('日') || s.contains('年');
+    has_md && digits.chars().any(|c| c.is_ascii_digit())
+}
+
+fn is_year_only(s: &str) -> bool {
+    let t = s.trim();
+    t.len() == 4
+        && t.chars().all(|c| c.is_ascii_digit())
+        && (t.starts_with("19") || t.starts_with("20"))
+}
+
 fn pair_address(items: &[LineItem], used: &mut [bool], min_c: f32) -> Option<FieldValue> {
     let label_idx = find_label_index(items, used, &["住址"])?;
     let label = &items[label_idx];
@@ -450,14 +525,15 @@ fn pair_address(items: &[LineItem], used: &mut [bool], min_c: f32) -> Option<Fie
         parts.push((item.text.clone(), item.score));
     }
 
-    // 下方连续行，直到号码区
+    // 下方连续行，直到号码区。
+    // 用 y0 < id_top（而非 y1）：末行可与「公民身份号码」行有轻微垂直重叠。
     let mut below: Vec<(usize, &LineItem)> = items
         .iter()
         .enumerate()
         .filter(|(i, l)| {
             !used[*i]
                 && l.y0 >= label.y1 - label.height * 0.2
-                && l.y1 < id_top
+                && l.y0 < id_top
                 && l.x0 >= label.x0 - label.height * 2.0
                 && !is_field_label(&l.text)
                 && find_valid_id_number(&l.text).is_none()
@@ -878,6 +954,52 @@ mod tests {
             Some("522530199208180048")
         );
         assert!(f.birth_date.is_none());
+    }
+
+    #[test]
+    fn birth_split_across_boxes_joins() {
+        // 合成证常见：出生1970 | 年6月12日
+        let output = OcrOutput {
+            lines: vec![
+                line("姓名", 428.0, 694.0, 652.0, 769.0, 0.99),
+                line("阿热吾斯塘", 621.0, 685.0, 996.0, 769.0, 0.99),
+                line("出生1970", 432.0, 972.0, 763.0, 1043.0, 1.0),
+                line("年6月12日", 844.0, 975.0, 1293.0, 1041.0, 0.99),
+                line("公民身份号码", 432.0, 1476.0, 797.0, 1542.0, 1.0),
+                line("622225197006128337", 894.0, 1472.0, 1854.0, 1551.0, 0.99),
+            ],
+        };
+        let r = parse_id_card(&output);
+        let f = r.front.expect("front");
+        assert_eq!(
+            f.birth_date.as_ref().map(|v| v.value.as_str()),
+            Some("1970-06-12")
+        );
+        assert_eq!(
+            f.id_number.as_ref().map(|v| v.value.as_str()),
+            Some("622225197006128337")
+        );
+    }
+
+    #[test]
+    fn address_includes_line_overlapping_id_label_band() {
+        // 末行 y1 可越过「公民身份号码」的 y0，只要 y0 仍在号码标签之上
+        let output = OcrOutput {
+            lines: vec![
+                line("住址", 432.0, 1114.0, 599.0, 1180.0, 0.99),
+                line("新疆维吾尔自治区伊犁哈", 619.0, 1109.0, 1340.0, 1187.0, 0.99),
+                line("萨克自治州伊宁县阿热吾", 625.0, 1208.0, 1342.0, 1287.0, 0.99),
+                line("斯塘乡阿热吾斯塘村托乎", 624.0, 1311.0, 1340.0, 1385.0, 0.98),
+                line("提于孜路四巷58号附1号", 622.0, 1410.0, 1309.0, 1485.0, 0.99),
+                line("公民身份号码", 432.0, 1476.0, 797.0, 1542.0, 1.0),
+                line("622225197006128337", 894.0, 1472.0, 1854.0, 1551.0, 0.99),
+            ],
+        };
+        let r = parse_id_card(&output);
+        let f = r.front.expect("front");
+        let addr = f.address.as_ref().unwrap().value.as_str();
+        assert!(addr.contains("新疆维吾尔自治区"));
+        assert!(addr.contains("提于孜路四巷58号附1号"), "got {addr}");
     }
 
     #[test]
