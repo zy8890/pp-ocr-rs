@@ -64,3 +64,21 @@ cargo run --release --bin idorc -- --image testdata/gen/front.png --format zh
 ```
 
 资源见 `assets/idgen/`。
+
+## HTTP API（idorc-server）
+
+Tokio + Poem + OpenAPI/Redoc。默认 **3** 个 OCR worker；需 Bearer API Key。
+
+```bash
+export IDORC_API_KEY=dev-secret
+cargo run --release --bin idorc-server -- --bind 127.0.0.1:8080 --workers 3 --fast
+
+# Redoc: http://127.0.0.1:8080/docs
+# OpenAPI: http://127.0.0.1:8080/openapi.json
+
+curl -s http://127.0.0.1:8080/health
+curl -s -H "Authorization: Bearer $IDORC_API_KEY" \
+  -F file=@234.png http://127.0.0.1:8080/v1/idcard/ocr
+```
+
+成功响应含 `zh` / `en` 字段分组与 `meta`（校验位、耗时等）。

@@ -1,8 +1,9 @@
 //! 二代身份证离线 OCR：基于 [rapidocr-core] 的检测/识别 + 结构化字段解析。
 
-pub mod gen;
+pub mod api;
 pub mod engine;
 pub mod format_out;
+pub mod gen;
 pub mod id_card;
 pub mod parse;
 pub mod preprocess;
