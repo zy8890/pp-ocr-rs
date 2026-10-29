@@ -75,7 +75,7 @@ cargo run --release --bin idgen -- --random --avatar face.png -o out.png
 
 ### 仓库卫生
 
-- `_ref_idcard_gen/` 仅作对照，**不提交**（加入 `.gitignore`）或实现完成后删除
+- 不保留外部 Python 参考仓库；本仓库仅为 Rust `idorc` / `idgen`
 - `assets/idgen/` 提交必要底图与字体
 - README 增加「测试图生成」小节 + 法律声明（仅测试）
 
